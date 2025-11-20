@@ -62,8 +62,8 @@ def get_agent():
     
     tools = [check_arcon_compliance]
     
-    # Create the ReAct agent using LangGraph's prebuilt function
-    graph = create_react_agent(llm, tools=tools, messages_modifier=SYSTEM_PROMPT)
+    # Create the ReAct agent using LangGraph's prebuilt function (no system prompt parameter)
+    graph = create_react_agent(llm, tools=tools)
     
     return graph
 
@@ -87,8 +87,12 @@ def run_agent(user_input: str, image_file=None):
             "type": "image_url",
             "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}
         })
-        
-    messages = [HumanMessage(content=content)]
+    
+    # Include system prompt as first message
+    messages = [
+        SystemMessage(content=SYSTEM_PROMPT),
+        HumanMessage(content=content)
+    ]
     
     # Invoke the agent
     result = agent.invoke({"messages": messages})
