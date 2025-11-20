@@ -63,7 +63,7 @@ def get_agent():
     tools = [check_arcon_compliance]
     
     # Create the ReAct agent using LangGraph's prebuilt function
-    graph = create_react_agent(llm, tools=tools, state_modifier=SYSTEM_PROMPT)
+    graph = create_react_agent(llm, tools=tools, messages_modifier=SYSTEM_PROMPT)
     
     return graph
 
