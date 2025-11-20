@@ -1,0 +1,96 @@
+import supabase
+from config import SUPABASE_URL, SUPABASE_SERVICE_KEY
+import time
+
+def get_supabase_client():
+    if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+        raise ValueError("Supabase credentials not found in environment variables.")
+    return supabase.create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+class VectorStore:
+    def __init__(self):
+        self.client = get_supabase_client()
+        self.table_name = "arcon_regulations"
+
+    def insert_chunks(self, chunks):
+        """
+        Insert a list of chunks (dict with content, metadata, embedding) into Supabase.
+        """
+        try:
+            # Explicitly reload schema cache if table not found error occurs
+            response = self.client.table(self.table_name).insert(chunks).execute()
+            return response.data
+        except Exception as e:
+            print(f"Error inserting chunks: {e}")
+            # Try to access table again to force schema refresh if possible or check if table exists
+            # Note: Supabase python client doesn't expose a direct reload_schema method easily
+            raise e
+
+    def get_count(self):
+        """
+        Get total count of rows in the table.
+        """
+        try:
+            # exact=True needed for count
+            response = self.client.table(self.table_name).select("*", count="exact", head=True).execute()
+            return response.count
+        except Exception as e:
+            print(f"Error getting count: {e}")
+            return 0
+
+    def search_similar(self, query_embedding, match_threshold=0.3, match_count=5):
+        """
+        Search for similar regulations using the match_arcon_regulations RPC.
+        """
+        params = {
+            "query_embedding": query_embedding,
+            "match_threshold": match_threshold,
+            "match_count": match_count
+        }
+        try:
+            response = self.client.rpc("match_arcon_regulations", params).execute()
+            return response.data
+        except Exception as e:
+            print(f"Error searching regulations: {e}")
+            return []
+
+# Global instance
+vector_store = VectorStore()
+
+def insert_chunks(chunks):
+    return vector_store.insert_chunks(chunks)
+
+def search_similar_regulations(query_embedding, match_threshold=0.3, match_count=5):
+    return vector_store.search_similar(query_embedding, match_threshold, match_count)
+
+def create_match_function_sql():
+    """
+    Returns the SQL to create the similarity search function.
+    Useful for setup scripts to display to user.
+    """
+    return """
+-- Function for vector similarity search
+CREATE OR REPLACE FUNCTION match_arcon_regulations(
+  query_embedding vector(3072),
+  match_threshold float DEFAULT 0.1,
+  match_count int DEFAULT 5
+)
+RETURNS TABLE (
+  id bigint,
+  content text,
+  metadata jsonb,
+  similarity float
+)
+LANGUAGE sql STABLE
+AS $$
+  SELECT
+    id,
+    content,
+    metadata,
+    1 - (arcon_regulations.embedding <=> query_embedding) as similarity
+  FROM arcon_regulations
+  WHERE 1 - (arcon_regulations.embedding <=> query_embedding) > match_threshold
+  ORDER BY arcon_regulations.embedding <=> query_embedding
+  LIMIT match_count;
+$$;
+"""
