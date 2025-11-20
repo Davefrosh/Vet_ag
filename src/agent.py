@@ -3,7 +3,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 from tools import check_arcon_compliance
-from config import OPENAI_API_KEY
+from config import load_config
 
 # System Prompt
 SYSTEM_PROMPT = """
@@ -57,6 +57,7 @@ Your final response must be structured exactly as follows:
 
 def get_agent():
     # Initialize the LLM - using GPT-4o-mini for cost efficiency with multimodal capabilities
+    OPENAI_API_KEY, _, _ = load_config()
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0, openai_api_key=OPENAI_API_KEY)
     
     tools = [check_arcon_compliance]

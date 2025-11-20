@@ -1,8 +1,9 @@
 import supabase
-from config import SUPABASE_URL, SUPABASE_SERVICE_KEY
+from config import load_config
 import time
 
 def get_supabase_client():
+    _, SUPABASE_URL, SUPABASE_SERVICE_KEY = load_config()
     if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
         raise ValueError("Supabase credentials not found in environment variables.")
     return supabase.create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
@@ -54,14 +55,21 @@ class VectorStore:
             print(f"Error searching regulations: {e}")
             return []
 
-# Global instance
-vector_store = VectorStore()
+# Global instance (lazy loaded)
+_vector_store = None
+
+def get_vector_store():
+    """Get or create the global vector store instance."""
+    global _vector_store
+    if _vector_store is None:
+        _vector_store = VectorStore()
+    return _vector_store
 
 def insert_chunks(chunks):
-    return vector_store.insert_chunks(chunks)
+    return get_vector_store().insert_chunks(chunks)
 
 def search_similar_regulations(query_embedding, match_threshold=0.3, match_count=5):
-    return vector_store.search_similar(query_embedding, match_threshold, match_count)
+    return get_vector_store().search_similar(query_embedding, match_threshold, match_count)
 
 def create_match_function_sql():
     """

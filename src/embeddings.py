@@ -2,7 +2,7 @@ import re
 from typing import List, Dict, Any
 from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from config import OPENAI_API_KEY
+from config import load_config
 
 # Initialize OpenAI Embeddings
 embeddings_model = None
@@ -10,6 +10,7 @@ embeddings_model = None
 def get_embeddings_model():
     global embeddings_model
     if embeddings_model is None:
+        OPENAI_API_KEY, _, _ = load_config()
         if not OPENAI_API_KEY:
              raise ValueError("OPENAI_API_KEY not set in config")
         embeddings_model = OpenAIEmbeddings(
