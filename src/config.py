@@ -1,18 +1,46 @@
 import os
+from pathlib import Path
 
 def get_config(key):
     """
     Get configuration value from Streamlit secrets or environment variables.
     This lazy loading approach ensures secrets are loaded when needed, not at import time.
     """
+    # First try environment variables (already loaded from .env)
+    from dotenv import load_dotenv
+    # Load .env from project root (parent directory of src/)
+    env_path = Path(__file__).parent.parent / '.env'
+    load_dotenv(dotenv_path=env_path)
+    
+    value = os.getenv(key)
+    if value:
+        return value
+    
+    # Then try Streamlit secrets
     try:
         import streamlit as st
-        return st.secrets[key]
+        if hasattr(st, 'secrets') and key in st.secrets:
+            return st.secrets[key]
     except:
-        # Fallback to .env for local development
-        from dotenv import load_dotenv
-        load_dotenv()
-        return os.getenv(key)
+        pass
+    
+    # If both fail, check if we have a secrets.toml file to parse manually
+    secrets_path = Path(__file__).parent.parent / '.streamlit' / 'secrets.toml'
+    if secrets_path.exists():
+        try:
+            # Simple parsing for our needs
+            with open(secrets_path, 'r') as f:
+                for line in f:
+                    if line.strip().startswith(key):
+                        # Extract value between quotes
+                        parts = line.split('=', 1)
+                        if len(parts) == 2:
+                            value = parts[1].strip().strip('"')
+                            return value
+        except:
+            pass
+    
+    return None
 
 # Lazy loaded configuration
 OPENAI_API_KEY = None

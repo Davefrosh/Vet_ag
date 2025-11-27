@@ -18,13 +18,10 @@ class VectorStore:
         Insert a list of chunks (dict with content, metadata, embedding) into Supabase.
         """
         try:
-            # Explicitly reload schema cache if table not found error occurs
             response = self.client.table(self.table_name).insert(chunks).execute()
             return response.data
         except Exception as e:
             print(f"Error inserting chunks: {e}")
-            # Try to access table again to force schema refresh if possible or check if table exists
-            # Note: Supabase python client doesn't expose a direct reload_schema method easily
             raise e
 
     def get_count(self):

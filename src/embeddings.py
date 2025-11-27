@@ -35,7 +35,6 @@ def generate_embeddings(chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     texts = [chunk['content'].replace("\n", " ") for chunk in chunks]
     
     # Embed in batches if needed, but langchain handles this usually
-    print(f"Generating embeddings for {len(texts)} chunks...")
     embeddings = model.embed_documents(texts)
     
     for i, chunk in enumerate(chunks):
