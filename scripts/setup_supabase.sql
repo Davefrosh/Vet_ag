@@ -48,3 +48,4 @@ $$;
 SELECT 'Setup complete! You can now run: python scripts/setup_database.py' as status;
 
 
+

@@ -4,7 +4,7 @@ import os
 import time
 import cv2
 from openai import OpenAI
-from moviepy.editor import VideoFileClip
+from moviepy import VideoFileClip
 
 class MediaProcessor:
     def __init__(self, openai_api_key):
@@ -140,12 +140,13 @@ class MediaProcessor:
                 os.unlink(tmp_path)
     
     def process_video(self, video_file):
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_file:
-            video_file.seek(0)
-            tmp_file.write(video_file.read())
-            tmp_path = tmp_file.name
-        
+        tmp_path = None
         try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_file:
+                video_file.seek(0)
+                tmp_file.write(video_file.read())
+                tmp_path = tmp_file.name
+            
             frames = self.extract_frames(tmp_path)
             audio_transcript = self.extract_and_transcribe_audio(tmp_path)
             
@@ -154,8 +155,13 @@ class MediaProcessor:
             
             return frames, audio_transcript, visual_analysis
         finally:
-            if os.path.exists(tmp_path):
-                os.unlink(tmp_path)
+            # Wait a moment for file handles to release on Windows
+            time.sleep(0.5)
+            if tmp_path and os.path.exists(tmp_path):
+                try:
+                    os.unlink(tmp_path)
+                except PermissionError:
+                    pass  # File will be cleaned up by OS later
     
     def extract_frames(self, video_path, max_frames=20):
         frames_base64 = []
@@ -217,6 +223,7 @@ class MediaProcessor:
     
     def extract_and_transcribe_audio(self, video_path):
         audio_path = None
+        video = None
         try:
             with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as audio_file:
                 audio_path = audio_file.name
@@ -224,10 +231,15 @@ class MediaProcessor:
             video = VideoFileClip(video_path)
             
             if video.audio is None:
+                video.close()
                 return "[No audio track found in video]"
             
             video.audio.write_audiofile(audio_path, logger=None, verbose=False)
             video.close()
+            video = None  # Mark as closed
+            
+            # Small delay to ensure file is released on Windows
+            time.sleep(0.3)
             
             with open(audio_path, 'rb') as audio:
                 transcript = self.client.audio.transcriptions.create(
@@ -240,5 +252,16 @@ class MediaProcessor:
         except Exception as e:
             return f"[Audio extraction failed: {str(e)}]"
         finally:
+            # Ensure video is closed
+            if video is not None:
+                try:
+                    video.close()
+                except:
+                    pass
+            # Wait and try to delete audio file
+            time.sleep(0.3)
             if audio_path and os.path.exists(audio_path):
-                os.unlink(audio_path)
+                try:
+                    os.unlink(audio_path)
+                except PermissionError:
+                    pass  # File will be cleaned up by OS later
