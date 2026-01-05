@@ -18,13 +18,17 @@ def get_config(key: str) -> str | None:
 OPENAI_API_KEY = None
 SUPABASE_URL = None
 SUPABASE_SERVICE_KEY = None
+ASSEMBLYAI_API_KEY = None
+API_SECRET_KEY = None
 
 
 def load_config():
     """Load all configuration values from environment variables."""
-    global OPENAI_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_KEY
+    global OPENAI_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_KEY, ASSEMBLYAI_API_KEY, API_SECRET_KEY
     if OPENAI_API_KEY is None:
         OPENAI_API_KEY = get_config("OPENAI_API_KEY")
         SUPABASE_URL = get_config("SUPABASE_URL")
         SUPABASE_SERVICE_KEY = get_config("SUPABASE_SERVICE_KEY")
-    return OPENAI_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_KEY
+        ASSEMBLYAI_API_KEY = get_config("ASSEMBLYAI_API_KEY")
+        API_SECRET_KEY = get_config("API_SECRET_KEY")
+    return OPENAI_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_KEY, ASSEMBLYAI_API_KEY, API_SECRET_KEY

@@ -1,4 +1,3 @@
-import base64
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
@@ -61,7 +60,7 @@ Based on the content, check relevant articles from:
 """
 
 def get_agent():
-    OPENAI_API_KEY, _, _ = load_config()
+    OPENAI_API_KEY, _, _, _ = load_config()
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0, openai_api_key=OPENAI_API_KEY)
     
     tools = [check_arcon_compliance]
@@ -71,13 +70,14 @@ def get_agent():
 
 def run_agent(media_file, media_type):
     agent = get_agent()
-    OPENAI_API_KEY, _, _ = load_config()
+    OPENAI_API_KEY, _, _, ASSEMBLYAI_API_KEY = load_config()
     
     content = []
     
     if media_type == 'image':
-        processor = MediaProcessor(OPENAI_API_KEY)
+        processor = MediaProcessor(OPENAI_API_KEY, ASSEMBLYAI_API_KEY)
         # Step 1: Extract Context (Forensic Analysis)
+        # Image is optimized (resized/compressed) inside analyze_image()
         visual_context = processor.analyze_image(media_file)
         
         image_prompt = f"""Analyze this advertisement image for ARCON compliance.
@@ -93,16 +93,12 @@ INSTRUCTIONS:
         
         content.append({"type": "text", "text": image_prompt})
         
-        # Attach the image for the agent's reference
-        media_file.seek(0)
-        image_data = base64.b64encode(media_file.read()).decode("utf-8")
-        content.append({
-            "type": "image_url",
-            "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}
-        })
+        # OPTIMIZATION: Do NOT send raw image to the Agent.
+        # We rely on the detailed Forensic Report to save tokens and handle large files.
+        # This is consistent with video processing pattern.
         
     elif media_type == 'video':
-        processor = MediaProcessor(OPENAI_API_KEY)
+        processor = MediaProcessor(OPENAI_API_KEY, ASSEMBLYAI_API_KEY)
         
         # Step 1: Extract all context (Frames, Transcript, and Forensic Report)
         frames, transcript, visual_analysis = processor.process_video(media_file)
@@ -130,7 +126,7 @@ INSTRUCTIONS:
         # We rely on the detailed Forensic Report to save tokens and avoid Rate Limits.
             
     elif media_type == 'audio':
-        processor = MediaProcessor(OPENAI_API_KEY)
+        processor = MediaProcessor(OPENAI_API_KEY, ASSEMBLYAI_API_KEY)
         transcript = processor.process_audio(media_file)
         
         audio_prompt = f"""Analyze this audio advertisement for ARCON compliance.

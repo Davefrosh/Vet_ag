@@ -3,16 +3,76 @@ import tempfile
 import os
 import time
 import cv2
+from io import BytesIO
+from PIL import Image
 from openai import OpenAI
 from moviepy import VideoFileClip
+import assemblyai as aai
 
 class MediaProcessor:
-    def __init__(self, openai_api_key):
+    def __init__(self, openai_api_key, assemblyai_api_key=None):
         self.client = OpenAI(api_key=openai_api_key)
+        
+        # Initialize AssemblyAI if key is provided
+        if assemblyai_api_key:
+            aai.settings.api_key = assemblyai_api_key
+            self.transcriber = aai.Transcriber()
+        else:
+            self.transcriber = None
+    
+    def _optimize_image(self, image_file, max_dimension=2048, quality=85):
+        """
+        Optimize image for API transmission.
+        Resizes large images and compresses to JPEG.
+        
+        Args:
+            image_file: File-like object of the image
+            max_dimension: Maximum width or height in pixels
+            quality: JPEG compression quality (1-100)
+            
+        Returns:
+            str: Base64 encoded optimized image
+        """
+        image_file.seek(0)
+        
+        # Open image with PIL
+        img = Image.open(image_file)
+        
+        # Convert to RGB if necessary (handles PNG with transparency, etc.)
+        if img.mode in ('RGBA', 'P', 'LA'):
+            # Create white background for transparent images
+            background = Image.new('RGB', img.size, (255, 255, 255))
+            if img.mode == 'P':
+                img = img.convert('RGBA')
+            background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+            img = background
+        elif img.mode != 'RGB':
+            img = img.convert('RGB')
+        
+        # Resize if larger than max dimension
+        width, height = img.size
+        if width > max_dimension or height > max_dimension:
+            # Calculate new dimensions maintaining aspect ratio
+            if width > height:
+                new_width = max_dimension
+                new_height = int(height * (max_dimension / width))
+            else:
+                new_height = max_dimension
+                new_width = int(width * (max_dimension / height))
+            
+            img = img.resize((new_width, new_height), Image.LANCZOS)
+        
+        # Compress to JPEG and encode to base64
+        buffer = BytesIO()
+        img.save(buffer, format='JPEG', quality=quality, optimize=True)
+        buffer.seek(0)
+        
+        return base64.b64encode(buffer.read()).decode('utf-8')
     
     def analyze_image(self, image_file):
         """
         Analyze a single image to extract detailed visual context using Vision AI.
+        Optimizes large images before sending to API.
         
         Args:
             image_file: File-like object of the image
@@ -20,8 +80,8 @@ class MediaProcessor:
         Returns:
             str: Detailed visual analysis report
         """
-        image_file.seek(0)
-        image_data = base64.b64encode(image_file.read()).decode("utf-8")
+        # Optimize image (resize and compress if needed)
+        image_data = self._optimize_image(image_file)
         
         prompt = """
         CRITICAL FORENSIC ANALYSIS:
@@ -109,43 +169,104 @@ class MediaProcessor:
                         continue
                 return "Visual analysis could not be completed due to technical issues."
 
+    def _transcribe_with_assemblyai(self, audio_path):
+        """
+        Transcribe audio using AssemblyAI.
+        Handles the async upload and polling internally.
+        
+        Args:
+            audio_path: Path to the audio file
+            
+        Returns:
+            str: Transcript text
+            
+        Raises:
+            Exception: If transcription fails
+        """
+        if not self.transcriber:
+            raise Exception("AssemblyAI is not configured. Please provide an API key.")
+        
+        try:
+            # AssemblyAI SDK handles upload, polling, and retrieval automatically
+            transcript = self.transcriber.transcribe(audio_path)
+            
+            if transcript.status == aai.TranscriptStatus.error:
+                raise Exception(f"Transcription failed: {transcript.error}")
+            
+            return transcript.text or "[No speech detected in audio]"
+            
+        except Exception as e:
+            raise Exception(f"Audio transcription failed: {str(e)}")
+    
     def process_audio(self, audio_file):
+        """
+        Process standalone audio files for transcription.
+        Uses chunked streaming to handle large files without loading entirely into memory.
+        
+        Args:
+            audio_file: File-like object of the audio
+            
+        Returns:
+            str: Transcript text
+        """
         audio_file.seek(0)
         
         file_extension = audio_file.name.split('.')[-1].lower()
         tmp_path = None
         
         try:
+            # Stream audio to temp file in chunks (memory-efficient for large files)
             with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_extension}') as tmp_file:
-                tmp_file.write(audio_file.read())
                 tmp_path = tmp_file.name
+                
+                # Read and write in 8MB chunks to avoid loading entire file into memory
+                chunk_size = 8 * 1024 * 1024  # 8MB chunks
+                while True:
+                    chunk = audio_file.read(chunk_size)
+                    if not chunk:
+                        break
+                    tmp_file.write(chunk)
             
-            with open(tmp_path, 'rb') as audio_file_handle:
-                transcript = self.client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=audio_file_handle,
-                    response_format="text"
-                )
+            # Use AssemblyAI for transcription
+            transcript = self._transcribe_with_assemblyai(tmp_path)
             
             return transcript
             
         except Exception as e:
             error_msg = str(e)
-            if "Invalid file format" in error_msg:
-                return f"[Audio transcription failed: The audio format '{file_extension}' is not supported. Please convert to MP3, WAV, or M4A format.]"
-            else:
-                raise Exception(f"Audio transcription failed: {error_msg}")
+            raise Exception(f"Vetting analysis wasn't carried out: {error_msg}")
         finally:
             if tmp_path and os.path.exists(tmp_path):
-                os.unlink(tmp_path)
+                try:
+                    os.unlink(tmp_path)
+                except PermissionError:
+                    pass
     
     def process_video(self, video_file):
+        """
+        Process video file for frame extraction and audio transcription.
+        Uses chunked streaming to handle large files without loading entirely into memory.
+        
+        Args:
+            video_file: File-like object of the video
+            
+        Returns:
+            tuple: (frames, audio_transcript, visual_analysis)
+        """
         tmp_path = None
         try:
+            # Stream video to temp file in chunks (memory-efficient for large files)
             with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_file:
-                video_file.seek(0)
-                tmp_file.write(video_file.read())
                 tmp_path = tmp_file.name
+                video_file.seek(0)
+                
+                # Read and write in 8MB chunks to avoid loading entire file into memory
+                chunk_size = 8 * 1024 * 1024  # 8MB chunks
+                while True:
+                    chunk = video_file.read(chunk_size)
+                    if not chunk:
+                        break
+                    tmp_file.write(chunk)
             
             frames = self.extract_frames(tmp_path)
             audio_transcript = self.extract_and_transcribe_audio(tmp_path)
@@ -222,6 +343,15 @@ class MediaProcessor:
         return frames_base64
     
     def extract_and_transcribe_audio(self, video_path):
+        """
+        Extract audio from video and transcribe using AssemblyAI.
+        
+        Args:
+            video_path: Path to the video file
+            
+        Returns:
+            str: Transcript text
+        """
         audio_path = None
         video = None
         try:
@@ -241,12 +371,9 @@ class MediaProcessor:
             # Small delay to ensure file is released on Windows
             time.sleep(0.3)
             
-            with open(audio_path, 'rb') as audio:
-                transcript = self.client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=audio,
-                    response_format="text"
-                )
+            # Use AssemblyAI for transcription
+            transcript = self._transcribe_with_assemblyai(audio_path)
+            
             return transcript
             
         except Exception as e:
