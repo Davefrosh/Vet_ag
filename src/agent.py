@@ -6,7 +6,6 @@ from config import load_config
 from media_processor import MediaProcessor
 import time
 
-# System Prompt
 SYSTEM_PROMPT = """
 You are an ARCON Compliance Analyst vetting advertisements against the Nigerian Code of Advertising Practice.
 
@@ -59,25 +58,23 @@ Based on the content, check relevant articles from:
 - [Actionable fix]
 """
 
+
 def get_agent():
-    OPENAI_API_KEY, _, _, _ = load_config()
+    OPENAI_API_KEY, _, _, _, _ = load_config()
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0, openai_api_key=OPENAI_API_KEY)
-    
     tools = [check_arcon_compliance]
     graph = create_react_agent(llm, tools=tools)
-    
     return graph
+
 
 def run_agent(media_file, media_type):
     agent = get_agent()
-    OPENAI_API_KEY, _, _, ASSEMBLYAI_API_KEY = load_config()
+    OPENAI_API_KEY, _, _, ASSEMBLYAI_API_KEY, _ = load_config()
     
     content = []
     
     if media_type == 'image':
         processor = MediaProcessor(OPENAI_API_KEY, ASSEMBLYAI_API_KEY)
-        # Step 1: Extract Context (Forensic Analysis)
-        # Image is optimized (resized/compressed) inside analyze_image()
         visual_context = processor.analyze_image(media_file)
         
         image_prompt = f"""Analyze this advertisement image for ARCON compliance.
@@ -93,17 +90,10 @@ INSTRUCTIONS:
         
         content.append({"type": "text", "text": image_prompt})
         
-        # OPTIMIZATION: Do NOT send raw image to the Agent.
-        # We rely on the detailed Forensic Report to save tokens and handle large files.
-        # This is consistent with video processing pattern.
-        
     elif media_type == 'video':
         processor = MediaProcessor(OPENAI_API_KEY, ASSEMBLYAI_API_KEY)
-        
-        # Step 1: Extract all context (Frames, Transcript, and Forensic Report)
         frames, transcript, visual_analysis = processor.process_video(media_file)
         
-        # Step 2: Prepare context for the Agent (Text Only to save tokens)
         video_prompt = f"""Analyze this video advertisement for ARCON compliance.
 
 CRITICAL EVIDENCE REPORT:
@@ -121,9 +111,6 @@ INSTRUCTIONS:
 - Perform the ARCON compliance check based on this combined evidence."""
         
         content.append({"type": "text", "text": video_prompt})
-        
-        # OPTIMIZATION: Do NOT send raw frames to the Agent. 
-        # We rely on the detailed Forensic Report to save tokens and avoid Rate Limits.
             
     elif media_type == 'audio':
         processor = MediaProcessor(OPENAI_API_KEY, ASSEMBLYAI_API_KEY)
@@ -143,7 +130,6 @@ Identify the product/service being advertised and check for compliance issues.""
         HumanMessage(content=content)
     ]
     
-    # Add retry logic for the main agent call
     max_retries = 3
     retry_delay = 5
     

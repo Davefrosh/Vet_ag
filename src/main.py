@@ -11,7 +11,6 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# CORS middleware for frontend access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,14 +19,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Supported file extensions
 IMAGE_EXTENSIONS = {"png", "jpg", "jpeg"}
 VIDEO_EXTENSIONS = {"mp4", "mov", "avi"}
 AUDIO_EXTENSIONS = {"mp3", "wav", "m4a", "flac", "webm", "mpeg", "mpga"}
 
 
 def verify_api_key(x_api_key: str = Header(..., alias="X-API-Key")):
-    """Validate the API key from request header."""
     _, _, _, _, api_secret_key = load_config()
     
     if not api_secret_key:
@@ -46,7 +43,6 @@ def verify_api_key(x_api_key: str = Header(..., alias="X-API-Key")):
 
 
 def get_tier(x_tier: str = Header(..., alias="X-Tier")):
-    """Extract and validate tier from request header."""
     try:
         return Tier(x_tier.lower())
     except ValueError:
@@ -57,7 +53,6 @@ def get_tier(x_tier: str = Header(..., alias="X-Tier")):
 
 
 class FileWrapper:
-    """Wrapper to make UploadFile compatible with media_processor expectations."""
     def __init__(self, file_obj, filename: str):
         self._file = file_obj
         self.name = filename
@@ -70,7 +65,6 @@ class FileWrapper:
 
 
 def get_media_type(filename: str) -> str | None:
-    """Detect media type from file extension."""
     if not filename:
         return None
     ext = filename.split('.')[-1].lower()
@@ -85,7 +79,6 @@ def get_media_type(filename: str) -> str | None:
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint for Cloud Run."""
     return {"status": "healthy"}
 
 
@@ -95,21 +88,6 @@ async def vet_advertisement(
     api_key: str = Depends(verify_api_key),
     tier: Tier = Depends(get_tier)
 ):
-    """
-    Vet an advertisement file against ARCON regulations.
-    
-    Requires:
-    - X-API-Key header: Your API secret key
-    - X-Tier header: User's subscription tier (free, pro, enterprise)
-    
-    Accepts image (PNG, JPG), video (MP4, MOV, AVI), or audio (MP3, WAV, M4A, etc.) files.
-    
-    File size limits:
-    - Free: 5 MB
-    - Pro: 25 MB
-    - Enterprise: 150 MB
-    """
-    # Detect media type
     media_type = get_media_type(file.filename)
     
     if not media_type:
@@ -119,11 +97,9 @@ async def vet_advertisement(
         )
     
     try:
-        # Read file content into memory
         content = await file.read()
         file_size = len(content)
         
-        # Validate file size against tier limit
         max_size = TIER_FILE_LIMITS[tier]
         if file_size > max_size:
             max_size_mb = max_size / (1024 * 1024)
@@ -134,11 +110,7 @@ async def vet_advertisement(
             )
         
         file_obj = BytesIO(content)
-        
-        # Wrap file to provide .name attribute for media_processor compatibility
         wrapped_file = FileWrapper(file_obj, file.filename)
-        
-        # Run the vetting agent
         analysis = run_agent(wrapped_file, media_type)
         
         return VetResponse(
@@ -149,7 +121,6 @@ async def vet_advertisement(
         )
         
     except HTTPException:
-        # Re-raise HTTP exceptions (like file size limit)
         raise
         
     except Exception as e:
