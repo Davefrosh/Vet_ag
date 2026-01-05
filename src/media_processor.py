@@ -6,7 +6,6 @@ import cv2
 from io import BytesIO
 from PIL import Image
 from openai import OpenAI
-from moviepy import VideoFileClip
 import assemblyai as aai
 
 
@@ -253,6 +252,8 @@ class MediaProcessor:
         return frames_base64
     
     def extract_and_transcribe_audio(self, video_path):
+        from moviepy import VideoFileClip  # Lazy import to avoid startup failures
+        
         audio_path = None
         video = None
         try:
