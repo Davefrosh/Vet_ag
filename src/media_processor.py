@@ -252,7 +252,11 @@ class MediaProcessor:
         return frames_base64
     
     def extract_and_transcribe_audio(self, video_path):
-        from moviepy import VideoFileClip  # Lazy import to avoid startup failures
+        # Lazy import with version compatibility (moviepy 1.x vs 2.x)
+        try:
+            from moviepy import VideoFileClip
+        except ImportError:
+            from moviepy.editor import VideoFileClip
         
         audio_path = None
         video = None
