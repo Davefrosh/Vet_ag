@@ -13,6 +13,9 @@ langchain-text-splitters>=0.3.0
 # Database
 supabase>=2.9.0
 
+# Cloud Storage
+google-cloud-storage>=2.14.0
+
 # Utilities
 python-dotenv>=1.0.0
 tiktoken>=0.7.0
