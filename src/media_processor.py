@@ -255,8 +255,10 @@ class MediaProcessor:
         # Lazy import with version compatibility (moviepy 1.x vs 2.x)
         try:
             from moviepy import VideoFileClip
+            moviepy_v2 = True
         except ImportError:
             from moviepy.editor import VideoFileClip
+            moviepy_v2 = False
         
         audio_path = None
         video = None
@@ -270,7 +272,11 @@ class MediaProcessor:
                 video.close()
                 return "[No audio track found in video]"
             
-            video.audio.write_audiofile(audio_path, logger=None, verbose=False)
+            # moviepy 2.x removed verbose parameter
+            if moviepy_v2:
+                video.audio.write_audiofile(audio_path, logger=None)
+            else:
+                video.audio.write_audiofile(audio_path, logger=None, verbose=False)
             video.close()
             video = None
             
