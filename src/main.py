@@ -6,6 +6,7 @@ from agent import run_agent
 from config import load_config
 from io import BytesIO
 from google.cloud import storage
+from google import auth
 from datetime import timedelta
 import os
 import tempfile
@@ -128,7 +129,18 @@ async def request_upload_url(
     import uuid
     gcs_path = f"uploads/{uuid.uuid4()}/{request.filename}"
     
-    client = get_gcs_client()
+    credentials, project = auth.default()
+    
+    if hasattr(credentials, "service_account_email"):
+        service_account_email = credentials.service_account_email
+    else:
+        service_account_email = os.getenv("SERVICE_ACCOUNT_EMAIL", "64011286693-compute@developer.gserviceaccount.com")
+    
+    from google.auth.transport import requests as google_requests
+    auth_request = google_requests.Request()
+    credentials.refresh(auth_request)
+    
+    client = storage.Client(credentials=credentials, project=project)
     bucket = client.bucket(GCS_BUCKET)
     blob = bucket.blob(gcs_path)
     
@@ -136,7 +148,9 @@ async def request_upload_url(
         version="v4",
         expiration=timedelta(minutes=15),
         method="PUT",
-        content_type="application/octet-stream"
+        content_type="application/octet-stream",
+        service_account_email=service_account_email,
+        access_token=credentials.token
     )
     
     return UploadResponse(upload_url=upload_url, gcs_path=gcs_path)
