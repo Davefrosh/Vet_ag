@@ -7,7 +7,8 @@ load_dotenv(dotenv_path=env_path)
 
 
 def get_config(key: str) -> str | None:
-    return os.getenv(key)
+    value = os.getenv(key)
+    return value.strip() if value else None
 
 
 OPENAI_API_KEY = None
