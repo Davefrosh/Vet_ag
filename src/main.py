@@ -127,28 +127,31 @@ async def request_upload_url(
         )
     
     import uuid
+    import requests as http_requests
+    
     gcs_path = f"uploads/{uuid.uuid4()}/{request.filename}"
     
-    from google.auth.transport import requests as google_requests
-    
     credentials, project = auth.default()
+    from google.auth.transport import requests as google_requests
     auth_request = google_requests.Request()
     credentials.refresh(auth_request)
     
-    service_account_email = "64011286693-compute@developer.gserviceaccount.com"
+    resumable_url = f"https://storage.googleapis.com/upload/storage/v1/b/{GCS_BUCKET}/o?uploadType=resumable&name={gcs_path}"
     
-    client = storage.Client(credentials=credentials, project=project)
-    bucket = client.bucket(GCS_BUCKET)
-    blob = bucket.blob(gcs_path)
-    
-    upload_url = blob.generate_signed_url(
-        version="v4",
-        expiration=timedelta(minutes=15),
-        method="PUT",
-        content_type="application/octet-stream",
-        service_account_email=service_account_email,
-        access_token=credentials.token
+    response = http_requests.post(
+        resumable_url,
+        headers={
+            "Authorization": f"Bearer {credentials.token}",
+            "Content-Type": "application/json",
+            "X-Upload-Content-Type": "application/octet-stream"
+        },
+        json={}
     )
+    
+    if response.status_code != 200:
+        raise HTTPException(status_code=500, detail=f"Failed to create upload session: {response.text}")
+    
+    upload_url = response.headers.get("Location")
     
     return UploadResponse(upload_url=upload_url, gcs_path=gcs_path)
 
