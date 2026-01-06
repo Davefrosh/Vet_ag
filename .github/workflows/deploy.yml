@@ -46,5 +46,9 @@ jobs:
             --region ${{ env.REGION }} \
             --platform managed \
             --allow-unauthenticated \
+            --memory=2Gi \
+            --cpu=2 \
+            --timeout=300 \
+            --concurrency=10 \
             --set-env-vars "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }},SUPABASE_URL=${{ secrets.SUPABASE_URL }},SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }},ASSEMBLYAI_API_KEY=${{ secrets.ASSEMBLYAI_API_KEY }},API_SECRET_KEY=${{ secrets.API_SECRET_KEY }}"
 
