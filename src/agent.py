@@ -94,13 +94,6 @@ INSTRUCTIONS:
         processor = MediaProcessor(OPENAI_API_KEY, ASSEMBLYAI_API_KEY)
         frames, transcript, visual_analysis = processor.process_video(media_file)
         
-        # Debug logging
-        print(f"[DEBUG] Frames extracted: {len(frames)}")
-        print(f"[DEBUG] Transcript length: {len(transcript)} chars")
-        print(f"[DEBUG] Transcript preview: {transcript[:200] if transcript else 'EMPTY'}...")
-        print(f"[DEBUG] Visual analysis length: {len(visual_analysis)} chars")
-        print(f"[DEBUG] Visual analysis preview: {visual_analysis[:200] if visual_analysis else 'EMPTY'}...")
-        
         video_prompt = f"""Analyze this video advertisement for ARCON compliance.
 
 CRITICAL EVIDENCE REPORT:
