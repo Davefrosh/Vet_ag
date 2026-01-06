@@ -129,16 +129,13 @@ async def request_upload_url(
     import uuid
     gcs_path = f"uploads/{uuid.uuid4()}/{request.filename}"
     
-    credentials, project = auth.default()
-    
-    if hasattr(credentials, "service_account_email"):
-        service_account_email = credentials.service_account_email
-    else:
-        service_account_email = os.getenv("SERVICE_ACCOUNT_EMAIL", "64011286693-compute@developer.gserviceaccount.com")
-    
     from google.auth.transport import requests as google_requests
+    
+    credentials, project = auth.default()
     auth_request = google_requests.Request()
     credentials.refresh(auth_request)
+    
+    service_account_email = "64011286693-compute@developer.gserviceaccount.com"
     
     client = storage.Client(credentials=credentials, project=project)
     bucket = client.bucket(GCS_BUCKET)
