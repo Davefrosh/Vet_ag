@@ -49,13 +49,17 @@ Based on the content, check relevant articles from:
 | [Relevant area 2] | PASS or FAIL | Art. X | Brief note |
 | [Add more rows as needed based on content] |
 
-**Verdict:** COMPLIANT / NON-COMPLIANT
+**Verdict:** [Use the appropriate tier based on score]
+- 100% → ✅ COMPLIANT
+- 80-99% → ⚠️ COMPLIANT WITH RECOMMENDATIONS
+- 50-79% → ⛔ PARTIALLY COMPLIANT
+- Below 50% → ❌ NON-COMPLIANT
 
 **Issues Found:** (Only if score < 100%)
 - [Specific violation with Article reference]
 
-**Recommendations:** (Only if non-compliant)
-- [Actionable fix]
+**Recommendations:** (If any issues found)
+- [Actionable fix to improve compliance]
 """
 
 
